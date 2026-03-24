@@ -1,0 +1,16 @@
+{
+  "name": "running-course",
+  "private": true,
+  "version": "0.0.0",
+  "scripts": {
+    "dev": "concurrently \"npm run dev:back\" \"npm run dev:front\"",
+    "dev:front": "npm run dev --prefix front",
+    "dev:back": "npm run dev --prefix back",
+    "build:front": "npm run build --prefix front",
+    "start:back": "npm run start --prefix back",
+    "install:all": "npm install --prefix front && npm install --prefix back"
+  },
+  "dependencies": {
+    "concurrently": "^9.2.1"
+  }
+}
