@@ -12,7 +12,7 @@ const markerClickListeners = [];
 let map = null;
 let polyline = null;
 let clickListener = null;
-let markerClickListener = null;
+const OVERLAP_OFFSET_PX = 20;
 
 const { points, routePath, totalDistanceKm, routeSource, isSyncing, addPoint } = useCoursePath();
 
@@ -30,6 +30,19 @@ function isNaverMapAvailable() {
     return typeof window !== 'undefined' && window.naver?.maps;
 }
 
+function pointKey(point) {
+    return `${Number(point.lat).toFixed(6)},${Number(point.lng).toFixed(6)}`;
+}
+
+function getMarkerOffsetPx(overlapIndex, overlapCount) {
+    if (overlapCount <= 1) return { x: 0, y: 0 };
+    const angle = (2 * Math.PI * overlapIndex) / overlapCount;
+    return {
+        x: Math.round(Math.cos(angle) * OVERLAP_OFFSET_PX),
+        y: Math.round(Math.sin(angle) * OVERLAP_OFFSET_PX),
+    };
+}
+
 function syncMarkersAndLine() {
     if (!map || !isNaverMapAvailable()) return;
 
@@ -38,13 +51,27 @@ function syncMarkersAndLine() {
     markers.forEach((marker) => marker.setMap(null));
     markers.length = 0;
 
+    const pointCountByKey = new Map();
+    for (const point of points.value) {
+        console.log('point', point);
+        const key = pointKey(point);
+        pointCountByKey.set(key, (pointCountByKey.get(key) ?? 0) + 1);
+    }
+    console.log('pointCountByKey', pointCountByKey);
+    const renderedCountByKey = new Map();
+
     for (const [index, point] of points.value.entries()) {
         const markerNumber = index + 1;
+        const key = pointKey(point);
+        const overlapCount = pointCountByKey.get(key) ?? 1;
+        const overlapIndex = renderedCountByKey.get(key) ?? 0;
+        renderedCountByKey.set(key, overlapIndex + 1);
+        const markerOffset = getMarkerOffsetPx(overlapIndex, overlapCount);
         const marker = new window.naver.maps.Marker({
             position: new window.naver.maps.LatLng(point.lat, point.lng),
             icon: {
                 content: `
-          <div class="course-marker">
+          <div class="course-marker" style="transform: translate(${markerOffset.x}px, ${markerOffset.y}px);">
             <span>${markerNumber}</span>
           </div>
         `,
