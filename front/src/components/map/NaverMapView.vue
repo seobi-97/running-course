@@ -53,11 +53,9 @@ function syncMarkersAndLine() {
 
     const pointCountByKey = new Map();
     for (const point of points.value) {
-        console.log('point', point);
         const key = pointKey(point);
         pointCountByKey.set(key, (pointCountByKey.get(key) ?? 0) + 1);
     }
-    console.log('pointCountByKey', pointCountByKey);
     const renderedCountByKey = new Map();
 
     for (const [index, point] of points.value.entries()) {

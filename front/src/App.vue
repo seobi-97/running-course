@@ -1,6 +1,7 @@
 <script setup>
 import CoursePanel from './components/course/CoursePanel.vue'
 import NaverMapView from './components/map/NaverMapView.vue'
+import ToastHost from './components/ui/ToastHost.vue'
 </script>
 
 <template>
@@ -13,6 +14,7 @@ import NaverMapView from './components/map/NaverMapView.vue'
       <NaverMapView />
       <CoursePanel />
     </main>
+    <ToastHost />
   </div>
 </template>
 

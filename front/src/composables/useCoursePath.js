@@ -1,5 +1,6 @@
 import { computed, ref, watch } from 'vue';
 import { fetchCourseMetrics, fetchCourseRecommendations } from '../services/courseApi';
+import { showToast } from './useToast';
 
 const points = ref([]);
 const totalDistanceMeters = ref(0);
@@ -15,6 +16,10 @@ const recommendationError = ref('');
 const isLoadingRecommendations = ref(false);
 
 let requestSequence = 0;
+
+function pointKeyForCompare(point) {
+    return `${Number(point.lat).toFixed(6)},${Number(point.lng).toFixed(6)}`;
+}
 
 async function syncDistanceFromServer() {
     if (points.value.length < 2) {
@@ -60,7 +65,21 @@ export function useCoursePath() {
     const totalDistanceKm = computed(() => (totalDistanceMeters.value / 1000).toFixed(2));
 
     function addPoint(point) {
-        points.value.push(point);
+        const next = {
+            lat: Number(point.lat),
+            lng: Number(point.lng),
+        };
+        if (!Number.isFinite(next.lat) || !Number.isFinite(next.lng)) return;
+
+        if (points.value.length > 0) {
+            const last = points.value[points.value.length - 1];
+            if (pointKeyForCompare(last) === pointKeyForCompare(next)) {
+                showToast('바로 이전 지점과 같은 위치입니다. 경로를 만들 수 없어요.');
+                return;
+            }
+        }
+
+        points.value.push(next);
         routePath.value = [...points.value];
         recommendations.value = [];
         recommendationError.value = '';
