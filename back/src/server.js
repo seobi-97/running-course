@@ -94,21 +94,25 @@ function buildStraightLineMetrics(points) {
             totalDistanceMeters: 0,
             segmentDistancesMeters: [],
             routePath: points,
+            routePathSegments: [],
         };
     }
 
     let totalDistanceMeters = 0;
     const segmentDistancesMeters = [];
+    const routePathSegments = [];
     for (let index = 0; index < points.length - 1; index += 1) {
         const segmentDistance = distanceInMeters(points[index], points[index + 1]);
         totalDistanceMeters += segmentDistance;
         segmentDistancesMeters.push(Math.round(segmentDistance));
+        routePathSegments.push([points[index], points[index + 1]]);
     }
 
     return {
         totalDistanceMeters: Math.round(totalDistanceMeters),
         segmentDistancesMeters,
         routePath: points,
+        routePathSegments,
     };
 }
 
@@ -321,6 +325,7 @@ async function calculateCourseMetrics(normalizedPoints) {
             totalDistanceKm: 0,
             segmentDistancesMeters: [],
             routePath: normalizedPoints,
+            routePathSegments: [],
             routeSource: 'TMAP_PEDESTRIAN',
         };
     }
@@ -329,6 +334,7 @@ async function calculateCourseMetrics(normalizedPoints) {
         let totalDistanceMeters = 0;
         const segmentDistancesMeters = [];
         const routePath = [];
+        const routePathSegments = [];
 
         for (let index = 0; index < normalizedPoints.length - 1; index += 1) {
             const start = normalizedPoints[index];
@@ -337,6 +343,13 @@ async function calculateCourseMetrics(normalizedPoints) {
 
             totalDistanceMeters += segment.totalDistanceMeters;
             segmentDistancesMeters.push(Math.round(segment.totalDistanceMeters));
+
+            const segmentPath = dedupePath(segment.routePath);
+            if (segmentPath.length < 2) {
+                routePathSegments.push([start, end]);
+            } else {
+                routePathSegments.push(segmentPath);
+            }
 
             if (routePath.length === 0) {
                 routePath.push(...segment.routePath);
@@ -351,6 +364,7 @@ async function calculateCourseMetrics(normalizedPoints) {
             totalDistanceKm: Number((totalDistanceMeters / 1000).toFixed(2)),
             segmentDistancesMeters,
             routePath: dedupePath(routePath),
+            routePathSegments,
             routeSource: 'TMAP_PEDESTRIAN',
         };
     } catch (error) {
@@ -361,6 +375,7 @@ async function calculateCourseMetrics(normalizedPoints) {
             totalDistanceKm: Number((fallback.totalDistanceMeters / 1000).toFixed(2)),
             segmentDistancesMeters: fallback.segmentDistancesMeters,
             routePath: fallback.routePath,
+            routePathSegments: fallback.routePathSegments,
             routeSource: 'HAVERSINE_FALLBACK',
             warning: error.message || 'TMAP 보행 경로를 계산하지 못해 직선 거리로 대체했습니다.',
         };
@@ -433,6 +448,7 @@ app.post('/api/course/recommendations', async (req, res) => {
             title: candidate.title,
             points: candidate.points,
             routePath: metrics.routePath,
+            routePathSegments: metrics.routePathSegments,
             totalDistanceMeters: metrics.totalDistanceMeters,
             totalDistanceKm: Number((metrics.totalDistanceMeters / 1000).toFixed(2)),
             segmentDistancesMeters: metrics.segmentDistancesMeters,

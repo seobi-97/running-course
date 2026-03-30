@@ -6,6 +6,7 @@ const {
   points,
   totalDistanceKm,
   segmentDistancesMeters,
+  highlightedSegmentIndex,
   isSyncing,
   syncError,
   syncWarning,
@@ -17,6 +18,7 @@ const {
   applyRecommendation,
   removeLastPoint,
   clearPoints,
+  toggleSegmentHighlight,
 } = useCoursePath()
 
 const pointCountText = computed(() => `${points.value.length}개`)
@@ -25,6 +27,7 @@ const segmentDistanceItems = computed(() =>
     id: `${index + 1}-${index + 2}`,
     label: `${index + 1} -> ${index + 2}`,
     text: distance < 1000 ? `${distance}m` : `${(distance / 1000).toFixed(2)}km`,
+    segmentIndex: index,
   })),
 )
 </script>
@@ -52,10 +55,18 @@ const segmentDistanceItems = computed(() =>
     </div>
     <div v-if="segmentDistanceItems.length" class="segment-box">
       <h3>구간 거리(최대 30개)</h3>
-      <ul>
+      <p class="segment-hint">구간을 클릭하면 지도에서 해당 구간만 강조됩니다. 다시 클릭하면 해제됩니다.</p>
+      <ul class="segment-list">
         <li v-for="segment in segmentDistanceItems" :key="segment.id">
-          <span>{{ segment.label }}</span>
-          <strong>{{ segment.text }}</strong>
+          <button
+            type="button"
+            class="segment-item"
+            :class="{ 'segment-item--active': highlightedSegmentIndex === segment.segmentIndex }"
+            @click="toggleSegmentHighlight(segment.segmentIndex)"
+          >
+            <span>{{ segment.label }}</span>
+            <strong>{{ segment.text }}</strong>
+          </button>
         </li>
       </ul>
     </div>
@@ -138,7 +149,14 @@ h2 {
   font-size: 14px;
 }
 
-.segment-box ul {
+.segment-hint {
+  margin: 0 0 8px;
+  font-size: 12px;
+  color: #64748b;
+  line-height: 1.4;
+}
+
+.segment-list {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -146,11 +164,37 @@ h2 {
   gap: 6px;
 }
 
-.segment-box li {
+.segment-item {
+  width: 100%;
   display: flex;
   justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  font: inherit;
   font-size: 13px;
   color: #334155;
+  text-align: left;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.segment-item:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+.segment-item--active {
+  background: #ecfdf5;
+  border-color: #16a34a;
+  box-shadow: 0 0 0 1px rgba(22, 163, 74, 0.25);
+}
+
+.segment-item strong {
+  color: #0f172a;
+  font-weight: 600;
 }
 
 .recommendation-box {

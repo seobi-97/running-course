@@ -6,6 +6,8 @@ const points = ref([]);
 const totalDistanceMeters = ref(0);
 const segmentDistancesMeters = ref([]);
 const routePath = ref([]);
+const routePathSegments = ref([]);
+const highlightedSegmentIndex = ref(null);
 const routeSource = ref('TMAP_PEDESTRIAN');
 const isSyncing = ref(false);
 const syncError = ref('');
@@ -21,11 +23,42 @@ function pointKeyForCompare(point) {
     return `${Number(point.lat).toFixed(6)},${Number(point.lng).toFixed(6)}`;
 }
 
+function normalizeRoutePathSegments(raw) {
+    if (!Array.isArray(raw)) return [];
+    return raw
+        .map((segment) => {
+            if (!Array.isArray(segment)) return [];
+            return segment
+                .map((point) => ({
+                    lat: Number(point.lat),
+                    lng: Number(point.lng),
+                }))
+                .filter((point) => Number.isFinite(point.lat) && Number.isFinite(point.lng));
+        })
+        .filter((segment) => segment.length >= 2);
+}
+
+function straightSegmentPathFromPoints(waypoints) {
+    if (!Array.isArray(waypoints) || waypoints.length < 2) return [];
+    const segments = [];
+    for (let index = 0; index < waypoints.length - 1; index += 1) {
+        const fromPoint = waypoints[index];
+        const toPoint = waypoints[index + 1];
+        segments.push([
+            { lat: Number(fromPoint.lat), lng: Number(fromPoint.lng) },
+            { lat: Number(toPoint.lat), lng: Number(toPoint.lng) },
+        ]);
+    }
+    return segments;
+}
+
 async function syncDistanceFromServer() {
     if (points.value.length < 2) {
         totalDistanceMeters.value = 0;
         segmentDistancesMeters.value = [];
         routePath.value = [...points.value];
+        routePathSegments.value = [];
+        highlightedSegmentIndex.value = null;
         routeSource.value = 'TMAP_PEDESTRIAN';
         syncError.value = '';
         syncWarning.value = '';
@@ -45,6 +78,18 @@ async function syncDistanceFromServer() {
             ? payload.segmentDistancesMeters.map((value) => Number(value || 0))
             : [];
         routePath.value = Array.isArray(payload.routePath) ? payload.routePath : [...points.value];
+        let nextSegments = normalizeRoutePathSegments(payload.routePathSegments);
+        if (nextSegments.length === 0 && points.value.length >= 2) {
+            nextSegments = straightSegmentPathFromPoints(points.value);
+        }
+        routePathSegments.value = nextSegments;
+        if (
+            highlightedSegmentIndex.value !== null &&
+            (highlightedSegmentIndex.value < 0 ||
+                highlightedSegmentIndex.value >= routePathSegments.value.length)
+        ) {
+            highlightedSegmentIndex.value = null;
+        }
         routeSource.value = payload.routeSource || 'TMAP_PEDESTRIAN';
         syncError.value = '';
         syncWarning.value = payload.warning || '';
@@ -52,6 +97,8 @@ async function syncDistanceFromServer() {
         if (currentSeq !== requestSequence) return;
         syncError.value = error.message || '백엔드 API와 연결되지 않아 거리 계산을 할 수 없습니다.';
         syncWarning.value = '';
+        routePathSegments.value = [];
+        highlightedSegmentIndex.value = null;
     } finally {
         if (currentSeq === requestSequence) {
             isSyncing.value = false;
@@ -99,6 +146,8 @@ export function useCoursePath() {
         totalDistanceMeters.value = 0;
         segmentDistancesMeters.value = [];
         routePath.value = [];
+        routePathSegments.value = [];
+        highlightedSegmentIndex.value = null;
         routeSource.value = 'TMAP_PEDESTRIAN';
         syncError.value = '';
         syncWarning.value = '';
@@ -157,6 +206,20 @@ export function useCoursePath() {
         syncWarning.value = recommendation.warning || '';
         syncError.value = '';
         isSyncing.value = false;
+        highlightedSegmentIndex.value = null;
+        const normalizedSegments = normalizeRoutePathSegments(recommendation.routePathSegments);
+        routePathSegments.value =
+            normalizedSegments.length > 0 ? normalizedSegments : straightSegmentPathFromPoints(points.value);
+    }
+
+    function toggleSegmentHighlight(segmentIndex) {
+        if (typeof segmentIndex !== 'number' || segmentIndex < 0) return;
+        if (segmentIndex >= routePathSegments.value.length) return;
+        if (highlightedSegmentIndex.value === segmentIndex) {
+            highlightedSegmentIndex.value = null;
+        } else {
+            highlightedSegmentIndex.value = segmentIndex;
+        }
     }
 
     return {
@@ -178,5 +241,8 @@ export function useCoursePath() {
         addPoint,
         removeLastPoint,
         clearPoints,
+        routePathSegments,
+        highlightedSegmentIndex,
+        toggleSegmentHighlight,
     };
 }

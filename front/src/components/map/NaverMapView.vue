@@ -11,10 +11,18 @@ const markerClickListeners = [];
 
 let map = null;
 let polyline = null;
+let polylineFocus = null;
 let clickListener = null;
 const OVERLAP_OFFSET_PX = 20;
 
-const { points, routePath, totalDistanceKm, routeSource, isSyncing, addPoint } = useCoursePath();
+const { points, routePath, routePathSegments, highlightedSegmentIndex, totalDistanceKm, routeSource, isSyncing, addPoint } = useCoursePath();
+
+const segmentFocusActive = computed(() => {
+    const index = highlightedSegmentIndex.value;
+    if (index === null || index === undefined) return false;
+    const segment = routePathSegments.value[index];
+    return Array.isArray(segment) && segment.length >= 2;
+});
 
 const statusText = computed(() => {
     if (mapError.value) return 'SDK 로드 실패';
@@ -41,6 +49,17 @@ function getMarkerOffsetPx(overlapIndex, overlapCount) {
         x: Math.round(Math.cos(angle) * OVERLAP_OFFSET_PX),
         y: Math.round(Math.sin(angle) * OVERLAP_OFFSET_PX),
     };
+}
+
+function disposePolylines() {
+    if (polyline) {
+        polyline.setMap(null);
+        polyline = null;
+    }
+    if (polylineFocus) {
+        polylineFocus.setMap(null);
+        polylineFocus = null;
+    }
 }
 
 function syncMarkersAndLine() {
@@ -89,27 +108,44 @@ function syncMarkersAndLine() {
 
     const linePoints = routePath.value.length >= 2 ? routePath.value : points.value;
     if (linePoints.length < 2) {
-        if (polyline) {
-            polyline.setMap(null);
-            polyline = null;
-        }
+        disposePolylines();
         return;
     }
 
-    const path = linePoints.map((point) => new window.naver.maps.LatLng(point.lat, point.lng));
+    const fullPath = linePoints.map((point) => new window.naver.maps.LatLng(point.lat, point.lng));
+    const segmentIndex = highlightedSegmentIndex.value;
+    const segments = routePathSegments.value;
+    const focusSegment = typeof segmentIndex === 'number' && segmentIndex >= 0 && segmentIndex < segments.length ? segments[segmentIndex] : null;
+    const focusValid = Array.isArray(focusSegment) && focusSegment.length >= 2;
 
-    if (!polyline) {
+    disposePolylines();
+
+    if (focusValid) {
         polyline = new window.naver.maps.Polyline({
             map,
-            path,
-            strokeColor: '#16a34a',
-            strokeOpacity: 0.85,
+            path: fullPath,
+            strokeColor: '#94a3b8',
+            strokeOpacity: 0.6,
             strokeWeight: 5,
+        });
+        const focusPath = focusSegment.map((point) => new window.naver.maps.LatLng(point.lat, point.lng));
+        polylineFocus = new window.naver.maps.Polyline({
+            map,
+            path: focusPath,
+            strokeColor: '#16a34a',
+            strokeOpacity: 1,
+            strokeWeight: 8,
         });
         return;
     }
 
-    polyline.setPath(path);
+    polyline = new window.naver.maps.Polyline({
+        map,
+        path: fullPath,
+        strokeColor: '#16a34a',
+        strokeOpacity: 0.8,
+        strokeWeight: 5,
+    });
 }
 
 onMounted(() => {
@@ -136,7 +172,7 @@ onMounted(() => {
     syncMarkersAndLine();
 });
 
-watch([points, routePath], syncMarkersAndLine, { deep: true });
+watch([points, routePath, routePathSegments, highlightedSegmentIndex], syncMarkersAndLine, { deep: true });
 
 onBeforeUnmount(() => {
     if (clickListener && isNaverMapAvailable()) {
@@ -148,10 +184,7 @@ onBeforeUnmount(() => {
     markers.forEach((marker) => marker.setMap(null));
     markers.length = 0;
 
-    if (polyline) {
-        polyline.setMap(null);
-        polyline = null;
-    }
+    disposePolylines();
 });
 </script>
 
