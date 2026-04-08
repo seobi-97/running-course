@@ -437,6 +437,10 @@ app.post('/api/course/recommendations', async (req, res) => {
     const evaluations = [];
     for (const candidate of candidates) {
         const metrics = await calculateCourseMetrics(candidate.points);
+        if (metrics.routeSource === 'HAVERSINE_FALLBACK') {
+            continue;
+        }
+
         const evaluated = evaluateRecommendation({
             totalDistanceMeters: metrics.totalDistanceMeters,
             routePath: metrics.routePath,
