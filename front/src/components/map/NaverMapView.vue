@@ -15,14 +15,14 @@ let polylineFocus = null;
 let clickListener = null;
 const OVERLAP_OFFSET_PX = 20;
 
-const { points, routePath, routePathSegments, highlightedSegmentIndex, totalDistanceKm, routeSource, isSyncing, addPoint } = useCoursePath();
+/** 전체/강조 폴리라인 색·두께 */
+const POLYLINE = {
+    default: { strokeColor: '#16a34a', strokeOpacity: 0.8, strokeWeight: 5 },
+    muted: { strokeColor: '#94a3b8', strokeOpacity: 0.6, strokeWeight: 5 },
+    focus: { strokeColor: '#16a34a', strokeOpacity: 1, strokeWeight: 8 },
+};
 
-const segmentFocusActive = computed(() => {
-    const index = highlightedSegmentIndex.value;
-    if (index === null || index === undefined) return false;
-    const segment = routePathSegments.value[index];
-    return Array.isArray(segment) && segment.length >= 2;
-});
+const { points, routePath, routePathSegments, highlightedSegmentIndex, totalDistanceKm, routeSource, isSyncing, addPoint } = useCoursePath();
 
 const statusText = computed(() => {
     if (mapError.value) return 'SDK 로드 실패';
@@ -124,17 +124,13 @@ function syncMarkersAndLine() {
         polyline = new window.naver.maps.Polyline({
             map,
             path: fullPath,
-            strokeColor: '#94a3b8',
-            strokeOpacity: 0.6,
-            strokeWeight: 5,
+            ...POLYLINE.muted,
         });
         const focusPath = focusSegment.map((point) => new window.naver.maps.LatLng(point.lat, point.lng));
         polylineFocus = new window.naver.maps.Polyline({
             map,
             path: focusPath,
-            strokeColor: '#16a34a',
-            strokeOpacity: 1,
-            strokeWeight: 8,
+            ...POLYLINE.focus,
         });
         return;
     }
@@ -142,9 +138,7 @@ function syncMarkersAndLine() {
     polyline = new window.naver.maps.Polyline({
         map,
         path: fullPath,
-        strokeColor: '#16a34a',
-        strokeOpacity: 0.8,
-        strokeWeight: 5,
+        ...POLYLINE.default,
     });
 }
 
@@ -189,59 +183,35 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-    <section class="map-card">
-        <div class="map-header">
-            <h2>지도</h2>
-            <span>{{ statusText }}</span>
-        </div>
-        <p v-if="mapError" class="map-error">{{ mapError }}</p>
-        <div ref="mapElement" id="naver-map" class="map-canvas"></div>
-        <div class="map-guide">지도를 클릭해서 러닝 코스 지점을 추가하세요. 총 거리와 경로는 TMAP 보행 API 기준으로 계산합니다.</div>
-    </section>
+    <v-card>
+        <v-card-title class="d-flex flex-wrap align-center justify-space-between gap-2 pb-2">
+            <span class="d-flex align-center gap-2">
+                <v-icon color="primary" icon="mdi-map" />
+                지도
+            </span>
+            <v-chip color="secondary" size="small" variant="tonal" class="text-caption font-weight-medium">
+                {{ statusText }}
+            </v-chip>
+        </v-card-title>
+        <v-card-text class="pt-0">
+            <v-alert v-if="mapError" type="error" variant="tonal" density="compact" class="mb-3" rounded="lg">
+                {{ mapError }}
+            </v-alert>
+            <div ref="mapElement" id="naver-map" class="map-canvas" />
+            <p class="text-body-2 text-medium-emphasis mt-3 mb-0">
+                지도를 클릭해서 러닝 코스 지점을 추가하세요. 총 거리와 경로는 TMAP 보행 API 기준으로 계산합니다.
+            </p>
+        </v-card-text>
+    </v-card>
 </template>
 
 <style scoped>
-.map-card {
-    background: #fff;
-    border: 1px solid #e5e7eb;
-    border-radius: 12px;
-    padding: 14px;
-}
-
-.map-header {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    margin-bottom: 10px;
-}
-
-.map-header h2 {
-    margin: 0;
-    font-size: 18px;
-}
-
-.map-header span {
-    font-size: 13px;
-    color: #6b7280;
-}
-
 .map-canvas {
     min-height: 520px;
-    border: 1px solid #cbd5e1;
-    border-radius: 10px;
-    background: #f8fafc;
-}
-
-.map-guide {
-    margin: 10px 2px 0;
-    font-size: 13px;
-    color: #475569;
-}
-
-.map-error {
-    margin: 0 0 10px;
-    color: #b91c1c;
-    font-size: 13px;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid rgba(var(--v-border-color), 0.12);
+    background: rgb(var(--v-theme-surface-variant));
 }
 
 :deep(.course-marker) {
@@ -249,7 +219,7 @@ onBeforeUnmount(() => {
     height: 30px;
     border-radius: 999px;
     border: 2px solid #ffffff;
-    background: #2563eb;
+    background: rgb(var(--v-theme-secondary));
     color: #ffffff;
     font-size: 13px;
     font-weight: 700;

@@ -2,6 +2,8 @@ import { computed, ref, watch } from 'vue';
 import { fetchCourseMetrics, fetchCourseRecommendations } from '../services/courseApi';
 import { showToast } from './useToast';
 
+/** @typedef {{ lat: number; lng: number }} LatLngPoint */
+
 const points = ref([]);
 const totalDistanceMeters = ref(0);
 const segmentDistancesMeters = ref([]);
@@ -23,6 +25,12 @@ function pointKeyForCompare(point) {
     return `${Number(point.lat).toFixed(6)},${Number(point.lng).toFixed(6)}`;
 }
 
+/**
+ * API 또는 추천 응답의 구간 좌표 배열을 정규화합니다. 원본은 변경하지 않습니다.
+ *
+ * @param {unknown} raw
+ * @returns {LatLngPoint[][]}
+ */
 function normalizeRoutePathSegments(raw) {
     if (!Array.isArray(raw)) return [];
     return raw
@@ -38,6 +46,12 @@ function normalizeRoutePathSegments(raw) {
         .filter((segment) => segment.length >= 2);
 }
 
+/**
+ * 연속 지점 사이를 직선 구간으로 나눕니다. (경로 세그먼트 폴백용)
+ *
+ * @param {readonly LatLngPoint[]} waypoints
+ * @returns {LatLngPoint[][]}
+ */
 function straightSegmentPathFromPoints(waypoints) {
     if (!Array.isArray(waypoints) || waypoints.length < 2) return [];
     const segments = [];
@@ -108,6 +122,34 @@ async function syncDistanceFromServer() {
 
 watch(points, syncDistanceFromServer, { deep: true });
 
+/**
+ * 코스 지점·TMAP 동기화 거리·구간 강조·추천 목록 상태를 제공합니다.
+ * 모듈 단일 인스턴스를 공유하므로, 지도와 패널에서 동일한 코스를 봅니다.
+ *
+ * @returns {{
+ *   points: import('vue').Ref<LatLngPoint[]>;
+ *   totalDistanceKm: import('vue').ComputedRef<string>;
+ *   totalDistanceMeters: import('vue').Ref<number>;
+ *   segmentDistancesMeters: import('vue').Ref<number[]>;
+ *   routePath: import('vue').Ref<LatLngPoint[]>;
+ *   routePathSegments: import('vue').Ref<LatLngPoint[][]>;
+ *   highlightedSegmentIndex: import('vue').Ref<number | null>;
+ *   routeSource: import('vue').Ref<string>;
+ *   isSyncing: import('vue').Ref<boolean>;
+ *   syncError: import('vue').Ref<string>;
+ *   syncWarning: import('vue').Ref<string>;
+ *   recommendationTargetKm: import('vue').Ref<number>;
+ *   recommendations: import('vue').Ref<unknown[]>;
+ *   recommendationError: import('vue').Ref<string>;
+ *   isLoadingRecommendations: import('vue').Ref<boolean>;
+ *   loadRecommendations: () => Promise<void>;
+ *   applyRecommendation: (recommendation: Record<string, unknown>) => void;
+ *   addPoint: (point: LatLngPoint) => void;
+ *   removeLastPoint: () => void;
+ *   clearPoints: () => void;
+ *   toggleSegmentHighlight: (segmentIndex: number) => void;
+ * }}
+ */
 export function useCoursePath() {
     const totalDistanceKm = computed(() => (totalDistanceMeters.value / 1000).toFixed(2));
 

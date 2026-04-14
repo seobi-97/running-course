@@ -10,19 +10,8 @@ body {
   font-family: 'Pretendard', 'Noto Sans KR', -apple-system, BlinkMacSystemFont, 'Segoe UI',
     Roboto, sans-serif;
   color: #111827;
-  background: #f8fafc;
 }
 
-button {
-  border: 1px solid #d1d5db;
-  border-radius: 8px;
-  padding: 8px 12px;
-  font: inherit;
-  color: #111827;
-  background: #fff;
-  cursor: pointer;
-}
-
-button:hover {
-  background: #f3f4f6;
+#app {
+  min-height: 100vh;
 }

@@ -1,256 +1,158 @@
 <script setup>
-import { computed } from 'vue'
-import { useCoursePath } from '../../composables/useCoursePath'
+import { computed } from 'vue';
+import { useCoursePath } from '../../composables/useCoursePath';
 
 const {
-  points,
-  totalDistanceKm,
-  segmentDistancesMeters,
-  highlightedSegmentIndex,
-  isSyncing,
-  syncError,
-  syncWarning,
-  recommendationTargetKm,
-  recommendations,
-  recommendationError,
-  isLoadingRecommendations,
-  loadRecommendations,
-  applyRecommendation,
-  removeLastPoint,
-  clearPoints,
-  toggleSegmentHighlight,
-} = useCoursePath()
+    points,
+    totalDistanceKm,
+    segmentDistancesMeters,
+    highlightedSegmentIndex,
+    isSyncing,
+    syncError,
+    syncWarning,
+    recommendationTargetKm,
+    recommendations,
+    recommendationError,
+    isLoadingRecommendations,
+    loadRecommendations,
+    applyRecommendation,
+    removeLastPoint,
+    clearPoints,
+    toggleSegmentHighlight,
+} = useCoursePath();
 
-const pointCountText = computed(() => `${points.value.length}개`)
+/**
+ * @param {number} meters
+ * @returns {string}
+ */
+function formatSegmentDistanceMeters(meters) {
+    if (meters < 1000) {
+        return `${meters}m`;
+    }
+    return `${(meters / 1000).toFixed(2)}km`;
+}
+
+const pointCountText = computed(() => `${points.value.length}개`);
 const segmentDistanceItems = computed(() =>
-  segmentDistancesMeters.value.map((distance, index) => ({
-    id: `${index + 1}-${index + 2}`,
-    label: `${index + 1} -> ${index + 2}`,
-    text: distance < 1000 ? `${distance}m` : `${(distance / 1000).toFixed(2)}km`,
-    segmentIndex: index,
-  })),
-)
+    segmentDistancesMeters.value.map((distance, index) => ({
+        id: `${index + 1}-${index + 2}`,
+        label: `${index + 1} → ${index + 2}`,
+        text: formatSegmentDistanceMeters(distance),
+        segmentIndex: index,
+    })),
+);
 </script>
 
 <template>
-  <aside class="panel-card">
-    <h2>코스 정보</h2>
-    <ul class="panel-list">
-      <li>
-        <span>선택 지점</span>
-        <strong>{{ pointCountText }}</strong>
-      </li>
-      <li>
-        <span>총 거리</span>
-        <strong>{{ totalDistanceKm }} km</strong>
-      </li>
-      <li>
-        <span>API 연동</span>
-        <strong>{{ isSyncing ? '계산 중' : '연결됨' }}</strong>
-      </li>
-    </ul>
-    <div class="panel-actions">
-      <button type="button" @click="removeLastPoint">마지막 지점 삭제</button>
-      <button type="button" @click="clearPoints">전체 초기화</button>
-    </div>
-    <div v-if="segmentDistanceItems.length" class="segment-box">
-      <h3>구간 거리(최대 30개)</h3>
-      <p class="segment-hint">구간을 클릭하면 지도에서 해당 구간만 강조됩니다. 다시 클릭하면 해제됩니다.</p>
-      <ul class="segment-list">
-        <li v-for="segment in segmentDistanceItems" :key="segment.id">
-          <button
-            type="button"
-            class="segment-item"
-            :class="{ 'segment-item--active': highlightedSegmentIndex === segment.segmentIndex }"
-            @click="toggleSegmentHighlight(segment.segmentIndex)"
-          >
-            <span>{{ segment.label }}</span>
-            <strong>{{ segment.text }}</strong>
-          </button>
-        </li>
-      </ul>
-    </div>
-    <div class="recommendation-box">
-      <label class="recommendation-label">
-        목표 거리(km)
-        <input v-model.number="recommendationTargetKm" type="number" min="2" max="30" step="0.5" />
-      </label>
-      <button type="button" :disabled="isLoadingRecommendations" @click="loadRecommendations">
-        {{ isLoadingRecommendations ? '추천 코스 계산 중...' : '러닝 코스 추천 받기' }}
-      </button>
-      <p v-if="recommendationError" class="panel-error">{{ recommendationError }}</p>
-      <ul v-if="recommendations.length" class="recommendation-list">
-        <li v-for="course in recommendations" :key="course.id">
-          <div>
-            <strong>{{ course.title }}</strong>
-            <p>{{ course.totalDistanceKm }}km · 점수 {{ course.score }}</p>
-            <p>{{ course.reason }}</p>
-          </div>
-          <button type="button" @click="applyRecommendation(course)">적용</button>
-        </li>
-      </ul>
-    </div>
-    <p class="panel-help">
-      시작 지점을 클릭한 뒤 추천을 누르면 규칙 기반으로 러닝 코스 3개를 제안합니다.
-    </p>
-    <p v-if="syncWarning" class="panel-warning">{{ syncWarning }}</p>
-    <p v-if="syncError" class="panel-error">{{ syncError }}</p>
-  </aside>
+    <v-card class="sticky-panel">
+        <v-card-title class="d-flex align-center gap-2 pb-2">
+            <v-icon color="primary" icon="mdi-map-marker-path" />
+            코스 정보
+        </v-card-title>
+
+        <v-card-text class="pt-0">
+            <v-list density="compact" class="bg-transparent pa-0">
+                <v-list-item class="px-0">
+                    <v-list-item-title>선택 지점</v-list-item-title>
+                    <template #append>
+                        <span class="text-body-1 font-weight-semibold">{{ pointCountText }}</span>
+                    </template>
+                </v-list-item>
+                <v-divider class="my-1" />
+                <v-list-item class="px-0">
+                    <v-list-item-title>총 거리</v-list-item-title>
+                    <template #append>
+                        <span class="text-body-1 font-weight-semibold text-primary">{{ totalDistanceKm }} km</span>
+                    </template>
+                </v-list-item>
+                <v-divider class="my-1" />
+                <v-list-item class="px-0">
+                    <v-list-item-title>API 연동</v-list-item-title>
+                    <template #append>
+                        <v-chip :color="isSyncing ? 'warning' : 'success'" size="small" variant="flat" class="font-weight-medium">
+                            {{ isSyncing ? '계산 중' : '연결됨' }}
+                        </v-chip>
+                    </template>
+                </v-list-item>
+            </v-list>
+
+            <div class="d-flex flex-wrap gap-2 mt-3">
+                <v-btn color="secondary" variant="tonal" prepend-icon="mdi-undo" @click="removeLastPoint"> 마지막 지점 삭제 </v-btn>
+                <v-btn color="secondary" prepend-icon="mdi-delete-sweep" @click="clearPoints"> 전체 초기화 </v-btn>
+            </div>
+
+            <template v-if="segmentDistanceItems.length">
+                <v-divider class="my-4" />
+                <div class="text-subtitle-2 font-weight-bold mb-1">구간 거리 (최대 30개)</div>
+                <p class="text-caption text-medium-emphasis mb-2">구간을 누르면 지도에서 해당 구간만 강조됩니다. 다시 누르면 해제됩니다.</p>
+                <v-list density="compact" class="segment-list bg-transparent pa-0">
+                    <v-list-item
+                        v-for="segment in segmentDistanceItems"
+                        :key="segment.id"
+                        class="segment-list-item px-2 mb-1 rounded"
+                        :active="highlightedSegmentIndex === segment.segmentIndex"
+                        rounded="lg"
+                        @click="toggleSegmentHighlight(segment.segmentIndex)"
+                    >
+                        <v-list-item-title class="text-body-2">{{ segment.label }}</v-list-item-title>
+                        <template #append>
+                            <span class="text-body-2 font-weight-bold">{{ segment.text }}</span>
+                        </template>
+                    </v-list-item>
+                </v-list>
+            </template>
+
+            <v-divider class="my-4" />
+
+            <div class="text-subtitle-2 font-weight-bold mb-3">러닝 코스 추천</div>
+            <v-text-field v-model.number="recommendationTargetKm" label="목표 거리 (km)" type="number" min="2" max="30" step="0.5" prepend-inner-icon="mdi-target" />
+            <v-btn block color="primary" size="large" class="mt-1" :loading="isLoadingRecommendations" prepend-icon="mdi-lightbulb-on-outline" @click="loadRecommendations">
+                {{ isLoadingRecommendations ? '추천 코스 계산 중...' : '러닝 코스 추천 받기' }}
+            </v-btn>
+
+            <v-alert v-if="recommendationError" type="error" variant="tonal" density="compact" class="mt-3" rounded="lg">
+                {{ recommendationError }}
+            </v-alert>
+
+            <v-list v-if="recommendations.length" class="bg-transparent pa-0 mt-3">
+                <v-card v-for="course in recommendations" :key="course.id" variant="outlined" class="mb-3 recommendation-card">
+                    <v-card-text>
+                        <div class="text-subtitle-1 font-weight-bold">{{ course.title }}</div>
+                        <div class="text-body-2 text-medium-emphasis mt-1">{{ course.totalDistanceKm }}km · 점수 {{ course.score }}</div>
+                        <p class="text-body-2 mt-2 mb-3">{{ course.reason }}</p>
+                        <v-btn color="primary" block prepend-icon="mdi-check" @click="applyRecommendation(course)"> 이 코스 적용 </v-btn>
+                    </v-card-text>
+                </v-card>
+            </v-list>
+
+            <v-alert type="info" variant="tonal" density="compact" class="mt-4" rounded="lg">
+                시작 지점을 클릭한 뒤 추천을 누르면 규칙 기반으로 러닝 코스 3개를 제안합니다.
+            </v-alert>
+
+            <v-alert v-if="syncWarning" type="warning" variant="tonal" density="compact" class="mt-3" rounded="lg">
+                {{ syncWarning }}
+            </v-alert>
+            <v-alert v-if="syncError" type="error" variant="tonal" density="compact" class="mt-3" rounded="lg">
+                {{ syncError }}
+            </v-alert>
+        </v-card-text>
+    </v-card>
 </template>
 
 <style scoped>
-.panel-card {
-  height: fit-content;
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  padding: 16px;
+.sticky-panel {
+    position: sticky;
+    top: 88px;
 }
 
-h2 {
-  margin: 0;
-  font-size: 18px;
+.segment-list-item.v-list-item--active {
+    background: rgba(var(--v-theme-primary), 0.12) !important;
+    border: 1px solid rgba(var(--v-theme-primary), 0.35);
 }
 
-.panel-list {
-  list-style: none;
-  margin: 14px 0;
-  padding: 0;
-  border-top: 1px solid #e5e7eb;
-  border-bottom: 1px solid #e5e7eb;
-}
-
-.panel-list li {
-  display: flex;
-  justify-content: space-between;
-  padding: 10px 0;
-}
-
-.panel-actions {
-  display: flex;
-  gap: 8px;
-}
-
-.panel-help {
-  margin: 12px 0 0;
-  color: #6b7280;
-  font-size: 13px;
-  line-height: 1.45;
-}
-
-.segment-box {
-  margin-top: 14px;
-  border-top: 1px solid #e5e7eb;
-  padding-top: 12px;
-}
-
-.segment-box h3 {
-  margin: 0 0 8px;
-  font-size: 14px;
-}
-
-.segment-hint {
-  margin: 0 0 8px;
-  font-size: 12px;
-  color: #64748b;
-  line-height: 1.4;
-}
-
-.segment-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 6px;
-}
-
-.segment-item {
-  width: 100%;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 10px;
-  font: inherit;
-  font-size: 13px;
-  color: #334155;
-  text-align: left;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  cursor: pointer;
-}
-
-.segment-item:hover {
-  background: #f1f5f9;
-  border-color: #cbd5e1;
-}
-
-.segment-item--active {
-  background: #ecfdf5;
-  border-color: #16a34a;
-  box-shadow: 0 0 0 1px rgba(22, 163, 74, 0.25);
-}
-
-.segment-item strong {
-  color: #0f172a;
-  font-weight: 600;
-}
-
-.recommendation-box {
-  margin-top: 14px;
-  border-top: 1px solid #e5e7eb;
-  padding-top: 12px;
-  display: grid;
-  gap: 8px;
-}
-
-.recommendation-label {
-  display: grid;
-  gap: 6px;
-  font-size: 13px;
-  color: #334155;
-}
-
-.recommendation-label input {
-  width: 100%;
-  border: 1px solid #d1d5db;
-  border-radius: 8px;
-  padding: 7px 10px;
-  font: inherit;
-}
-
-.recommendation-list {
-  list-style: none;
-  margin: 4px 0 0;
-  padding: 0;
-  display: grid;
-  gap: 8px;
-}
-
-.recommendation-list li {
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  padding: 10px;
-  display: grid;
-  gap: 8px;
-}
-
-.recommendation-list p {
-  margin: 4px 0 0;
-  color: #475569;
-  font-size: 12px;
-}
-
-.panel-error {
-  margin-top: 8px;
-  font-size: 13px;
-  color: #b91c1c;
-}
-
-.panel-warning {
-  margin-top: 8px;
-  font-size: 13px;
-  color: #92400e;
+@media (max-width: 1279px) {
+    .sticky-panel {
+        position: static;
+    }
 }
 </style>

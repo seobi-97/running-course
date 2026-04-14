@@ -131,17 +131,9 @@ function destinationPoint(start, bearingDegrees, distanceMeters) {
     const lng1 = toRadians(start.lng);
     const angularDistance = distanceMeters / earthRadius;
 
-    const lat2 = Math.asin(
-        Math.sin(lat1) * Math.cos(angularDistance) +
-            Math.cos(lat1) * Math.sin(angularDistance) * Math.cos(bearing),
-    );
+    const lat2 = Math.asin(Math.sin(lat1) * Math.cos(angularDistance) + Math.cos(lat1) * Math.sin(angularDistance) * Math.cos(bearing));
 
-    const lng2 =
-        lng1 +
-        Math.atan2(
-            Math.sin(bearing) * Math.sin(angularDistance) * Math.cos(lat1),
-            Math.cos(angularDistance) - Math.sin(lat1) * Math.sin(lat2),
-        );
+    const lng2 = lng1 + Math.atan2(Math.sin(bearing) * Math.sin(angularDistance) * Math.cos(lat1), Math.cos(angularDistance) - Math.sin(lat1) * Math.sin(lat2));
 
     return {
         lat: Number(toDegrees(lat2).toFixed(6)),
@@ -184,9 +176,7 @@ function buildRecommendationCandidates(startPoint, targetDistanceMeters) {
     ];
 
     return templates.map((template, index) => {
-        const waypoints = template.bearings.map((bearing, waypointIndex) =>
-            destinationPoint(startPoint, bearing, targetDistanceMeters * template.ratios[waypointIndex]),
-        );
+        const waypoints = template.bearings.map((bearing, waypointIndex) => destinationPoint(startPoint, bearing, targetDistanceMeters * template.ratios[waypointIndex]));
 
         return {
             id: `candidate-${index + 1}`,
@@ -198,11 +188,7 @@ function buildRecommendationCandidates(startPoint, targetDistanceMeters) {
 
 function headingDegrees(a, b) {
     const y = Math.sin(toRadians(b.lng - a.lng)) * Math.cos(toRadians(b.lat));
-    const x =
-        Math.cos(toRadians(a.lat)) * Math.sin(toRadians(b.lat)) -
-        Math.sin(toRadians(a.lat)) *
-            Math.cos(toRadians(b.lat)) *
-            Math.cos(toRadians(b.lng - a.lng));
+    const x = Math.cos(toRadians(a.lat)) * Math.sin(toRadians(b.lat)) - Math.sin(toRadians(a.lat)) * Math.cos(toRadians(b.lat)) * Math.cos(toRadians(b.lng - a.lng));
 
     const degrees = toDegrees(Math.atan2(y, x));
     return (degrees + 360) % 360;
@@ -235,9 +221,7 @@ function repeatRatio(path) {
         sampled.push(path[index]);
     }
 
-    const buckets = new Set(
-        sampled.map((point) => `${point.lat.toFixed(4)}:${point.lng.toFixed(4)}`),
-    );
+    const buckets = new Set(sampled.map((point) => `${point.lat.toFixed(4)}:${point.lng.toFixed(4)}`));
 
     return 1 - buckets.size / sampled.length;
 }
@@ -382,6 +366,7 @@ async function calculateCourseMetrics(normalizedPoints) {
     }
 }
 
+// 상태 확인 API
 app.get('/api/health', (_req, res) => {
     res.json({
         ok: true,
