@@ -19,7 +19,7 @@ const OVERLAP_OFFSET_PX = 20;
 const POLYLINE = {
     default: { strokeColor: '#16a34a', strokeOpacity: 0.8, strokeWeight: 5 },
     muted: { strokeColor: '#94a3b8', strokeOpacity: 0.6, strokeWeight: 5 },
-    focus: { strokeColor: '#16a34a', strokeOpacity: 1, strokeWeight: 8 },
+    focus: { strokeColor: '#16a34a', strokeOpacity: 1, strokeWeight: 7 },
 };
 
 const { points, routePath, routePathSegments, highlightedSegmentIndex, totalDistanceKm, routeSource, isSyncing, addPoint } = useCoursePath();
@@ -198,9 +198,7 @@ onBeforeUnmount(() => {
                 {{ mapError }}
             </v-alert>
             <div ref="mapElement" id="naver-map" class="map-canvas" />
-            <p class="text-body-2 text-medium-emphasis mt-3 mb-0">
-                지도를 클릭해서 러닝 코스 지점을 추가하세요. 총 거리와 경로는 TMAP 보행 API 기준으로 계산합니다.
-            </p>
+            <p class="text-body-2 text-medium-emphasis mt-3 mb-0">지도를 클릭해서 러닝 코스 지점을 추가하세요. 총 거리와 경로는 TMAP 보행 API 기준으로 계산합니다.</p>
         </v-card-text>
     </v-card>
 </template>

@@ -14,6 +14,21 @@ app.use(express.json());
 
 const segmentCache = new Map();
 
+async function withRetry(fn, maxRetries = 2, baseDelayMs = 400) {
+    let lastError;
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        try {
+            return await fn();
+        } catch (error) {
+            lastError = error;
+            if (attempt < maxRetries) {
+                await new Promise((resolve) => setTimeout(resolve, baseDelayMs * (attempt + 1)));
+            }
+        }
+    }
+    throw lastError;
+}
+
 function isValidPoint(point) {
     if (!point || typeof point !== 'object') return false;
 
@@ -142,37 +157,19 @@ function destinationPoint(start, bearingDegrees, distanceMeters) {
 }
 
 function buildRecommendationCandidates(startPoint, targetDistanceMeters) {
+    // 등변삼각형 루프: 도로 실거리 ≈ 직선 * 1.25 → 각 꼭짓점까지 직선 ≈ target / (3 * 1.25) ≈ 0.267
+    // 꼭짓점 간 각도 차이 60° (등변삼각형)
+    // 넓은 루프(이등변삼각형): 꼭짓점 간 각도 차이 90°~120°, ratio 0.30
+    // 사각형 루프(3개 중간점): 모서리 비율 0.20, 대각 0.28
     const templates = [
-        {
-            title: '강변 순환형',
-            bearings: [20, 120],
-            ratios: [0.28, 0.24],
-        },
-        {
-            title: '도심 완만 루프',
-            bearings: [60, 180],
-            ratios: [0.25, 0.22],
-        },
-        {
-            title: '공원 우회 루프',
-            bearings: [300, 40],
-            ratios: [0.27, 0.23],
-        },
-        {
-            title: '직선 왕복형',
-            bearings: [90],
-            ratios: [0.48],
-        },
-        {
-            title: '대각 순환형',
-            bearings: [330, 210],
-            ratios: [0.26, 0.25],
-        },
-        {
-            title: '반시계 루프',
-            bearings: [250, 130],
-            ratios: [0.28, 0.24],
-        },
+        { title: '북동 삼각 루프', bearings: [10, 70], ratios: [0.27, 0.27] },
+        { title: '동남 삼각 루프', bearings: [100, 160], ratios: [0.27, 0.27] },
+        { title: '남서 삼각 루프', bearings: [190, 250], ratios: [0.27, 0.27] },
+        { title: '서북 삼각 루프', bearings: [280, 340], ratios: [0.27, 0.27] },
+        { title: '북쪽 넓은 루프', bearings: [300, 60], ratios: [0.3, 0.3] },
+        { title: '남쪽 넓은 루프', bearings: [120, 240], ratios: [0.3, 0.3] },
+        { title: '시계방향 사각 루프', bearings: [0, 45, 90], ratios: [0.2, 0.28, 0.2] },
+        { title: '반시계 사각 루프', bearings: [0, 315, 270], ratios: [0.2, 0.28, 0.2] },
     ];
 
     return templates.map((template, index) => {
@@ -226,7 +223,7 @@ function repeatRatio(path) {
     return 1 - buckets.size / sampled.length;
 }
 
-function evaluateRecommendation({ totalDistanceMeters, routePath, targetDistanceMeters }) {
+function evaluateRecommendation({ totalDistanceMeters, routePath, targetDistanceMeters, routeSource }) {
     const distanceGapRatio = Math.abs(totalDistanceMeters - targetDistanceMeters) / targetDistanceMeters;
     const sharpTurnCount = countSharpTurns(routePath);
     const overlapRatio = repeatRatio(routePath);
@@ -234,12 +231,17 @@ function evaluateRecommendation({ totalDistanceMeters, routePath, targetDistance
     const distanceScore = Math.max(0, 1 - distanceGapRatio);
     const turnScore = Math.max(0, 1 - sharpTurnCount / 25);
     const overlapScore = Math.max(0, 1 - overlapRatio * 1.4);
-    const totalScore = Math.round((distanceScore * 0.55 + turnScore * 0.25 + overlapScore * 0.2) * 100);
+    const baseScore = Math.round((distanceScore * 0.55 + turnScore * 0.25 + overlapScore * 0.2) * 100);
+
+    // PARTIAL_FALLBACK: 일부 구간이 직선 추정이므로 신뢰도 감점
+    const sourcePenalty = routeSource === 'PARTIAL_FALLBACK' ? 12 : 0;
+    const totalScore = Math.max(0, baseScore - sourcePenalty);
 
     const reason = [];
     reason.push(`목표거리 오차 ${Math.round(distanceGapRatio * 100)}%`);
     reason.push(`급회전 ${sharpTurnCount}회`);
     reason.push(`중복구간 ${Math.round(overlapRatio * 100)}%`);
+    if (routeSource === 'PARTIAL_FALLBACK') reason.push('일부 구간 추정');
 
     return {
         score: totalScore,
@@ -248,46 +250,42 @@ function evaluateRecommendation({ totalDistanceMeters, routePath, targetDistance
 }
 
 async function requestTmapPedestrianSegment(start, end) {
-    const response = await fetch('https://apis.openapi.sk.com/tmap/routes/pedestrian?version=1&format=json', {
-        method: 'POST',
-        headers: {
-            appKey: tmapApiKey,
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-            startX: String(start.lng),
-            startY: String(start.lat),
-            endX: String(end.lng),
-            endY: String(end.lat),
-            reqCoordType: 'WGS84GEO',
-            resCoordType: 'WGS84GEO',
-            startName: '출발',
-            endName: '도착',
-            searchOption: '30',
-        }),
+    return withRetry(async () => {
+        const response = await fetch('https://apis.openapi.sk.com/tmap/routes/pedestrian?version=1&format=json', {
+            method: 'POST',
+            headers: {
+                appKey: tmapApiKey,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                startX: String(start.lng),
+                startY: String(start.lat),
+                endX: String(end.lng),
+                endY: String(end.lat),
+                reqCoordType: 'WGS84GEO',
+                resCoordType: 'WGS84GEO',
+                startName: '출발',
+                endName: '도착',
+                searchOption: '0', //
+            }),
+        });
+        const payload = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+            const message = payload?.error?.message || payload?.message || `HTTP ${response.status}`;
+            throw new Error(`TMAP 보행 경로 요청 실패: ${message}`);
+        }
+
+        const features = Array.isArray(payload?.features) ? payload.features : [];
+        const routePath = parseRoutePath(features);
+        const totalDistanceMeters = parseTotalDistance(features, routePath);
+
+        if (routePath.length < 2) {
+            throw new Error('TMAP 응답에 유효한 경로 좌표가 없습니다.');
+        }
+
+        return { totalDistanceMeters, routePath };
     });
-    const payload = await response.json().catch(() => ({}));
-
-    if (!response.ok) {
-        const message = payload?.error?.message || payload?.message || `HTTP ${response.status}`;
-        throw new Error(`TMAP 보행 경로 요청 실패: ${message}`);
-    }
-
-    const features = Array.isArray(payload?.features) ? payload.features : [];
-    const routePath = parseRoutePath(features);
-    const totalDistanceMeters = parseTotalDistance(features, routePath);
-
-    if (routePath.length === 0) {
-        return {
-            totalDistanceMeters: Math.round(distanceInMeters(start, end)),
-            routePath: [start, end],
-        };
-    }
-
-    return {
-        totalDistanceMeters,
-        routePath,
-    };
 }
 
 async function getPedestrianSegment(start, end) {
@@ -314,56 +312,57 @@ async function calculateCourseMetrics(normalizedPoints) {
         };
     }
 
-    try {
-        let totalDistanceMeters = 0;
-        const segmentDistancesMeters = [];
-        const routePath = [];
-        const routePathSegments = [];
+    let totalDistanceMeters = 0;
+    const segmentDistancesMeters = [];
+    const routePath = [];
+    const routePathSegments = [];
+    let tmapCount = 0;
+    let fallbackCount = 0;
+    const warnings = [];
 
-        for (let index = 0; index < normalizedPoints.length - 1; index += 1) {
-            const start = normalizedPoints[index];
-            const end = normalizedPoints[index + 1];
-            const segment = await getPedestrianSegment(start, end);
+    for (let index = 0; index < normalizedPoints.length - 1; index += 1) {
+        const start = normalizedPoints[index];
+        const end = normalizedPoints[index + 1];
 
-            totalDistanceMeters += segment.totalDistanceMeters;
-            segmentDistancesMeters.push(Math.round(segment.totalDistanceMeters));
-
-            const segmentPath = dedupePath(segment.routePath);
-            if (segmentPath.length < 2) {
-                routePathSegments.push([start, end]);
-            } else {
-                routePathSegments.push(segmentPath);
-            }
-
-            if (routePath.length === 0) {
-                routePath.push(...segment.routePath);
-            } else {
-                routePath.push(...segment.routePath.slice(1));
-            }
+        let segment;
+        try {
+            segment = await getPedestrianSegment(start, end);
+            tmapCount += 1;
+        } catch (error) {
+            fallbackCount += 1;
+            warnings.push(`구간 ${index + 1}: ${error.message}`);
+            segment = {
+                totalDistanceMeters: Math.round(distanceInMeters(start, end)),
+                routePath: [start, end],
+            };
         }
 
-        return {
-            pointCount: normalizedPoints.length,
-            totalDistanceMeters,
-            totalDistanceKm: Number((totalDistanceMeters / 1000).toFixed(2)),
-            segmentDistancesMeters,
-            routePath: dedupePath(routePath),
-            routePathSegments,
-            routeSource: 'TMAP_PEDESTRIAN',
-        };
-    } catch (error) {
-        const fallback = buildStraightLineMetrics(normalizedPoints);
-        return {
-            pointCount: normalizedPoints.length,
-            totalDistanceMeters: fallback.totalDistanceMeters,
-            totalDistanceKm: Number((fallback.totalDistanceMeters / 1000).toFixed(2)),
-            segmentDistancesMeters: fallback.segmentDistancesMeters,
-            routePath: fallback.routePath,
-            routePathSegments: fallback.routePathSegments,
-            routeSource: 'HAVERSINE_FALLBACK',
-            warning: error.message || 'TMAP 보행 경로를 계산하지 못해 직선 거리로 대체했습니다.',
-        };
+        totalDistanceMeters += segment.totalDistanceMeters;
+        segmentDistancesMeters.push(Math.round(segment.totalDistanceMeters));
+
+        const segmentPath = dedupePath(segment.routePath);
+        routePathSegments.push(segmentPath.length >= 2 ? segmentPath : [start, end]);
+
+        if (routePath.length === 0) {
+            routePath.push(...segment.routePath);
+        } else {
+            routePath.push(...segment.routePath.slice(1));
+        }
     }
+
+    const totalSegments = normalizedPoints.length - 1;
+    const routeSource = fallbackCount === 0 ? 'TMAP_PEDESTRIAN' : fallbackCount < totalSegments ? 'PARTIAL_FALLBACK' : 'HAVERSINE_FALLBACK';
+
+    return {
+        pointCount: normalizedPoints.length,
+        totalDistanceMeters,
+        totalDistanceKm: Number((totalDistanceMeters / 1000).toFixed(2)),
+        segmentDistancesMeters,
+        routePath: dedupePath(routePath),
+        routePathSegments,
+        routeSource,
+        ...(warnings.length > 0 && { warning: warnings.join(' | ') }),
+    };
 }
 
 // 상태 확인 API
@@ -422,6 +421,8 @@ app.post('/api/course/recommendations', async (req, res) => {
     const evaluations = [];
     for (const candidate of candidates) {
         const metrics = await calculateCourseMetrics(candidate.points);
+
+        // 전 구간이 직선 추정인 경우 신뢰도가 없으므로 제외
         if (metrics.routeSource === 'HAVERSINE_FALLBACK') {
             continue;
         }
@@ -430,6 +431,7 @@ app.post('/api/course/recommendations', async (req, res) => {
             totalDistanceMeters: metrics.totalDistanceMeters,
             routePath: metrics.routePath,
             targetDistanceMeters,
+            routeSource: metrics.routeSource,
         });
 
         evaluations.push({

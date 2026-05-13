@@ -2,6 +2,11 @@
 
 `running-course`를 프론트엔드(Vue)와 백엔드(Node.js)로 분리한 구조입니다.
 
+## Open API 사용
+
+- **네이버 지도 JavaScript API**: 프론트 지도 렌더링 및 사용자 클릭 좌표 입력
+- **TMAP 보행 경로 API**: 백엔드 거리/경로 계산 및 코스 추천 데이터 생성
+
 ## 프로젝트 구조
 
 ```text
