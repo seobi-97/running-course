@@ -44,7 +44,7 @@ const segmentDistanceItems = computed(() =>
 </script>
 
 <template>
-    <v-card class="sticky-panel">
+    <v-card>
         <v-card-title class="d-flex align-center gap-2 pb-2">
             <v-icon color="primary" icon="mdi-map-marker-path" />
             코스 정보
@@ -140,19 +140,8 @@ const segmentDistanceItems = computed(() =>
 </template>
 
 <style scoped>
-.sticky-panel {
-    position: sticky;
-    top: 88px;
-}
-
 .segment-list-item.v-list-item--active {
     background: rgba(var(--v-theme-primary), 0.12) !important;
     border: 1px solid rgba(var(--v-theme-primary), 0.35);
-}
-
-@media (max-width: 1279px) {
-    .sticky-panel {
-        position: static;
-    }
 }
 </style>
