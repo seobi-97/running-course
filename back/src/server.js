@@ -212,6 +212,24 @@ function countSharpTurns(path) {
     return sharpTurnCount;
 }
 
+function weightedTurnPenalty(path) {
+    if (!Array.isArray(path) || path.length < 3) return 0;
+
+    let penalty = 0;
+    for (let index = 1; index < path.length - 1; index += 1) {
+        const h1 = headingDegrees(path[index - 1], path[index]);
+        const h2 = headingDegrees(path[index], path[index + 1]);
+        let diff = Math.abs(h2 - h1);
+        if (diff > 180) diff = 360 - diff;
+
+        if (diff >= 150) penalty += 8;      // U턴에 가까운 역방향
+        else if (diff >= 90) penalty += 3;  // 급회전
+        else if (diff >= 55) penalty += 1;  // 경미한 방향 전환
+    }
+
+    return penalty;
+}
+
 function repeatRatio(path) {
     if (!Array.isArray(path) || path.length < 2) return 0;
 
@@ -229,16 +247,21 @@ function repeatRatio(path) {
 function evaluateRecommendation({ totalDistanceMeters, routePath, targetDistanceMeters }) {
     const distanceGapRatio = Math.abs(totalDistanceMeters - targetDistanceMeters) / targetDistanceMeters;
     const sharpTurnCount = countSharpTurns(routePath);
+    const turnPenalty = weightedTurnPenalty(routePath);
     const overlapRatio = repeatRatio(routePath);
 
-    const distanceScore = Math.max(0, 1 - distanceGapRatio);
-    const turnScore = Math.max(0, 1 - sharpTurnCount / 25);
+    // 비선형 거리 점수: 오차가 커질수록 급격히 감소 (10% 오차 → 0.74, 현재 0.90)
+    const distanceScore = Math.exp(-3 * distanceGapRatio);
+    // 가중 급회전 점수: U턴(8점), 급회전(3점), 경미한 전환(1점) - 최대 60점 기준 정규화
+    const turnScore = Math.max(0, 1 - turnPenalty / 60);
     const overlapScore = Math.max(0, 1 - overlapRatio * 1.4);
-    const totalScore = Math.round((distanceScore * 0.55 + turnScore * 0.25 + overlapScore * 0.2) * 100);
+    // 가중치: 거리 정확도 50% / 회전 품질 30% / 중복 구간 20%
+    const totalScore = Math.round((distanceScore * 0.5 + turnScore * 0.3 + overlapScore * 0.2) * 100);
 
     const reason = [];
     reason.push(`목표거리 오차 ${Math.round(distanceGapRatio * 100)}%`);
-    reason.push(`급회전 ${sharpTurnCount}회`);
+    const turnLabel = turnPenalty >= 40 ? '회전 복잡' : turnPenalty >= 15 ? '회전 보통' : '회전 양호';
+    reason.push(`${turnLabel}(${sharpTurnCount}회)`);
     reason.push(`중복구간 ${Math.round(overlapRatio * 100)}%`);
 
     return {
