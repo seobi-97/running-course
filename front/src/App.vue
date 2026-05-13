@@ -22,17 +22,42 @@ import ToastHost from './components/ui/ToastHost.vue'
         <p class="text-body-2 text-medium-emphasis mb-6">
           네이버 지도와 Node.js API를 연결한 러닝 코스 계산기입니다.
         </p>
-        <v-row>
-          <v-col cols="12" lg="8">
+        <div class="course-grid">
+          <div class="map-section">
             <NaverMapView />
-          </v-col>
-          <v-col cols="12" lg="4">
+          </div>
+          <div class="panel-section">
             <CoursePanel />
-          </v-col>
-        </v-row>
+          </div>
+        </div>
       </v-container>
     </v-main>
 
     <ToastHost />
   </v-app>
 </template>
+
+<style scoped>
+.course-grid {
+  display: grid;
+  gap: 24px;
+}
+
+@media (min-width: 1280px) {
+  .course-grid {
+    grid-template-columns: 2fr 1fr;
+    align-items: start; /* sticky가 동작하려면 stretch가 아니어야 함 */
+  }
+
+  /* 지도 영역을 헤더 바로 아래에 고정 — 패널은 페이지와 함께 스크롤 */
+  .map-section {
+    position: sticky;
+    top: calc(var(--v-layout-top) + 16px);
+    height: calc(100dvh - var(--v-layout-top) - 32px);
+  }
+
+  .map-section :deep(.v-card) {
+    height: 100%;
+  }
+}
+</style>

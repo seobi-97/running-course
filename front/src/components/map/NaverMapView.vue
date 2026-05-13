@@ -183,7 +183,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-    <v-card>
+    <v-card class="map-card">
         <v-card-title class="d-flex flex-wrap align-center justify-space-between gap-2 pb-2">
             <span class="d-flex align-center gap-2">
                 <v-icon color="primary" icon="mdi-map" />
@@ -212,6 +212,26 @@ onBeforeUnmount(() => {
     overflow: hidden;
     border: 1px solid rgba(var(--v-border-color), 0.12);
     background: rgb(var(--v-theme-surface-variant));
+}
+
+@media (min-width: 1280px) {
+    .map-card {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .map-card :deep(.v-card-text) {
+        flex: 1;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .map-canvas {
+        flex: 1;
+        min-height: 200px;
+    }
 }
 
 :deep(.course-marker) {
