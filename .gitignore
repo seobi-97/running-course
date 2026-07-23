@@ -26,3 +26,5 @@ dist-ssr
 .env
 front/.env
 back/.env
+# TypeScript build info
+*.tsbuildinfo
